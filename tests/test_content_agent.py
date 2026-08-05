@@ -3,20 +3,20 @@ from placement_agent_swarm.schemas.state import AgentState, WorkflowStatus
 
 
 def test_content_agent_generates_content() -> None:
-    state: AgentState = {
-        "workflow_id": "test-001",
-        "status": WorkflowStatus.RUNNING,
-        "domain": "communication",
-        "topic": "subject-verb agreement",
-        "requested_output": "practice_set",
-        "current_agent": "source_agent",
-        "next_agent": "content_agent",
-        "error_message": None,
-        "sources": [
+    state = AgentState(
+        workflow_id="test-001",
+        status=WorkflowStatus.RUNNING,
+        domain="communication",
+        topic="subject-verb agreement",
+        requested_output="practice_set",
+        current_agent="source_agent",
+        next_agent="content_agent",
+        error_message=None,
+        sources=[
             "Approved source placeholder for: subject-verb agreement"
         ],
-        "generated_content": None,
-    }
+        generated_content=None,
+    )
 
     result = content_agent(state)
 
@@ -24,5 +24,9 @@ def test_content_agent_generates_content() -> None:
     assert result["current_agent"] == "content_agent"
     assert result["next_agent"] == "end"
     assert result["error_message"] is None
-    assert result["generated_content"] is not None
-    assert "subject-verb agreement" in result["generated_content"]
+
+    generated_content = result["generated_content"]
+
+    assert isinstance(generated_content, str)
+    assert "subject-verb agreement" in generated_content
+    assert "Approved source placeholder" in generated_content
