@@ -1,0 +1,20 @@
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: Ruff check
+        entry: uv run ruff check .
+        language: system
+        pass_filenames: false
+
+      - id: mypy-check
+        name: MyPy check
+        entry: uv run mypy src
+        language: system
+        pass_filenames: false
+
+      - id: pytest-check
+        name: Pytest
+        entry: uv run pytest -q
+        language: system
+        pass_filenames: false
