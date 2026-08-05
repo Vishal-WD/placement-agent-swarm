@@ -10,7 +10,7 @@ def run_command(command: list[str]) -> int:
 def main() -> None:
     commands = [
         ["ruff", "check", "."],
-        ["mypy", "src"],
+        ["mypy", "src", "tests"],
         ["pytest", "-v"],
     ]
 

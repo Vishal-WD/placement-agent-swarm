@@ -36,14 +36,16 @@ def test_agent_state_rejects_empty_required_fields() -> None:
 
 
 def test_agent_state_rejects_extra_fields() -> None:
+    invalid_data: dict[str, object] = {
+        "workflow_id": "test-001",
+        "status": WorkflowStatus.CREATED,
+        "domain": "communication",
+        "topic": "subject-verb agreement",
+        "requested_output": "practice_set",
+        "current_agent": "",
+        "next_agent": "",
+        "unexpected_field": "not allowed",
+    }
+
     with pytest.raises(ValidationError):
-        AgentState(
-            workflow_id="test-001",
-            status=WorkflowStatus.CREATED,
-            domain="communication",
-            topic="subject-verb agreement",
-            requested_output="practice_set",
-            current_agent="",
-            next_agent="",
-            unexpected_field="not allowed",
-        )
+        AgentState.model_validate(invalid_data)

@@ -1,19 +1,13 @@
 from placement_agent_swarm.agents.source_agent import source_agent
-from placement_agent_swarm.schemas.state import AgentState, WorkflowStatus
+from placement_agent_swarm.schemas.state import WorkflowStatus
+from tests.factories import make_agent_state
 
 
 def test_source_agent_adds_source() -> None:
-    state = AgentState(
-        workflow_id="test-001",
+    state = make_agent_state(
         status=WorkflowStatus.RUNNING,
-        domain="communication",
-        topic="subject-verb agreement",
-        requested_output="practice_set",
         current_agent="supervisor",
         next_agent="source_agent",
-        error_message=None,
-        sources=[],
-        generated_content=None,
     )
 
     result = source_agent(state)
