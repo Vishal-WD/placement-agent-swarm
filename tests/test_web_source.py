@@ -50,3 +50,22 @@ def test_extract_text_from_html_removes_tags() -> None:
         "Grammar Subject-Verb Agreement "
         "The verb must agree with the subject."
     )
+def test_extract_text_from_html_ignores_style_and_script() -> None:
+    html = (
+        "<html>"
+        "<head>"
+        "<style>body { background: red; }</style>"
+        "<script>console.log('ignore me')</script>"
+        "</head>"
+        "<body>"
+        "<h1>Example Domain</h1>"
+        "<p>Readable content</p>"
+        "</body>"
+        "</html>"
+    )
+
+    result = extract_text_from_html(html)
+
+    assert result == "Example Domain Readable content"
+    assert "background" not in result
+    assert "console.log" not in result
