@@ -2,6 +2,8 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from placement_agent_swarm.schemas.source import CollectedSource
+
 
 class WorkflowStatus(StrEnum):
     CREATED = "created"
@@ -21,5 +23,5 @@ class AgentState(BaseModel):
     current_agent: str
     next_agent: str
     error_message: str | None = None
-    sources: list[str] = Field(default_factory=list)
+    sources: list[CollectedSource] = Field(default_factory=list)
     generated_content: str | None = None

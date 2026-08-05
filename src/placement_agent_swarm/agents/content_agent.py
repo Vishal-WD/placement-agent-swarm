@@ -3,13 +3,14 @@ from placement_agent_swarm.schemas.state import AgentState, WorkflowStatus
 
 def content_agent(state: AgentState) -> dict[str, object]:
     topic = state.topic
-    sources = state.sources
 
-    source_summary = ", ".join(sources)
+    source_summary = "\n".join(
+        f"- {source.title}: {source.content}" for source in state.sources
+    )
 
     generated_content = (
         f"Topic: {topic}\n"
-        f"Sources: {source_summary}\n"
+        f"Sources:\n{source_summary}\n"
         "Generated content placeholder."
     )
 

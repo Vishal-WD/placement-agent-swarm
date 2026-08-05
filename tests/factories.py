@@ -1,3 +1,4 @@
+from placement_agent_swarm.schemas.source import CollectedSource
 from placement_agent_swarm.schemas.state import AgentState, WorkflowStatus
 
 
@@ -11,7 +12,7 @@ def make_agent_state(
     current_agent: str = "",
     next_agent: str = "",
     error_message: str | None = None,
-    sources: list[str] | None = None,
+    sources: list[CollectedSource] | None = None,
     generated_content: str | None = None,
 ) -> AgentState:
     return AgentState(
