@@ -8,6 +8,7 @@ from placement_agent_swarm.schemas.source import CollectedSource
 DEFAULT_MAX_ATTEMPTS = 3
 DEFAULT_RETRY_DELAY_SECONDS = 1.0
 DEFAULT_REQUEST_TIMEOUT_SECONDS = 10.0
+DEFAULT_USER_AGENT = "placement-agent-swarm/0.1"
 
 
 class WebSourceFetchError(RuntimeError):
@@ -61,6 +62,7 @@ def fetch_web_source(
     max_attempts: int = DEFAULT_MAX_ATTEMPTS,
     retry_delay_seconds: float = DEFAULT_RETRY_DELAY_SECONDS,
     request_timeout_seconds: float = DEFAULT_REQUEST_TIMEOUT_SECONDS,
+    user_agent: str = DEFAULT_USER_AGENT,
 ) -> CollectedSource:
     if max_attempts < 1:
         raise ValueError("max_attempts must be at least 1")
@@ -71,10 +73,15 @@ def fetch_web_source(
     if request_timeout_seconds <= 0:
         raise ValueError("request_timeout_seconds must be greater than 0")
 
+    cleaned_user_agent = user_agent.strip()
+
+    if not cleaned_user_agent:
+        raise ValueError("user_agent cannot be empty")
+
     request = Request(
         url,
         headers={
-            "User-Agent": "placement-agent-swarm/0.1",
+            "User-Agent": cleaned_user_agent,
         },
     )
 

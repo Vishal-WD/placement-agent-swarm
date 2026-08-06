@@ -234,7 +234,45 @@ def test_extract_text_from_html_removes_tags() -> None:
         "The verb must agree with the subject."
     )
 
+def test_fetch_web_source_uses_configured_user_agent() -> None:
+    mock_response = MagicMock()
+    mock_response.read.return_value = (
+        b"<html><body><p>User agent content</p></body></html>"
+    )
+    mock_response.__enter__.return_value = mock_response
+    mock_response.__exit__.return_value = False
 
+    with patch(
+        "placement_agent_swarm.connectors.web_source.urlopen",
+        return_value=mock_response,
+    ) as mock_urlopen:
+        source = fetch_web_source(
+            url="https://example.com/user-agent",
+            title="User Agent Source",
+            user_agent="placement-agent-swarm-test/1.0",
+        )
+
+    assert source.title == "User Agent Source"
+    assert source.content == "User agent content"
+
+    request = mock_urlopen.call_args.args[0]
+
+    assert request.get_header("User-agent") == (
+        "placement-agent-swarm-test/1.0"
+    )
+
+
+def test_fetch_web_source_rejects_empty_user_agent() -> None:
+    with pytest.raises(
+        ValueError,
+        match="user_agent cannot be empty",
+    ):
+        fetch_web_source(
+            url="https://example.com/user-agent",
+            title="User Agent Source",
+            user_agent="   ",
+        )
+        
 def test_extract_text_from_html_ignores_style_and_script() -> None:
     html = (
         "<html>"
