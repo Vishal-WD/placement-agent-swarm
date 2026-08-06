@@ -6,22 +6,31 @@ from placement_agent_swarm.schemas.state import WorkflowStatus
 from tests.factories import make_agent_state
 
 
-def test_content_graph_runs_complete_workflow() -> None:
-    mocked_source = CollectedSource.model_validate(
+def test_content_graph_runs_complete_multi_source_workflow() -> None:
+    first_source = CollectedSource.model_validate(
         {
-            "title": "Approved source for subject-verb agreement",
-            "url": "https://example.com/",
-            "source_type": "website",
-            "content": "Example Domain",
+            "title": "Purdue OWL Grammar",
+            "url": "https://owl.purdue.edu/owl/general_writing/grammar/",
+            "source_type": "official_learning_resource",
+            "content": "Grammar learning content from Purdue OWL.",
+        }
+    )
+
+    second_source = CollectedSource.model_validate(
+        {
+            "title": "British Council Grammar",
+            "url": "https://learnenglish.britishcouncil.org/grammar",
+            "source_type": "official_learning_resource",
+            "content": "Grammar learning content from the British Council.",
         }
     )
 
     graph = build_content_graph()
-    initial_state = make_agent_state()
+    initial_state = make_agent_state(domain="communication")
 
     with patch(
         "placement_agent_swarm.agents.source_agent.fetch_web_source",
-        return_value=mocked_source,
+        side_effect=[first_source, second_source],
     ):
         result = graph.invoke(initial_state)
 
@@ -33,11 +42,36 @@ def test_content_graph_runs_complete_workflow() -> None:
 
     sources = result["sources"]
 
-    assert sources == [mocked_source]
+    assert sources == [first_source, second_source]
 
     generated_content = result["generated_content"]
 
     assert isinstance(generated_content, str)
     assert "subject-verb agreement" in generated_content
-    assert "Approved source for subject-verb agreement" in generated_content
-    assert "Example Domain" in generated_content
+    assert "Purdue OWL Grammar" in generated_content
+    assert "British Council Grammar" in generated_content
+    assert "Grammar learning content from Purdue OWL." in generated_content
+    assert (
+        "Grammar learning content from the British Council."
+        in generated_content
+    )
+def test_content_graph_stops_when_domain_has_no_sources() -> None:
+    graph = build_content_graph()
+    initial_state = make_agent_state(domain="unknown-domain")
+
+    with patch(
+        "placement_agent_swarm.agents.source_agent.fetch_web_source"
+    ) as mock_fetch:
+        result = graph.invoke(initial_state)
+
+    assert result["workflow_id"] == "test-001"
+    assert result["status"] == WorkflowStatus.FAILED
+    assert result["current_agent"] == "source_agent"
+    assert result["next_agent"] == "end"
+    assert result["sources"] == []
+    assert result["generated_content"] is None
+    assert result["error_message"] == (
+        "No approved sources configured for domain: unknown-domain"
+    )
+
+    mock_fetch.assert_not_called()
