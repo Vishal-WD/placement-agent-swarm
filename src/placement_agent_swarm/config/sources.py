@@ -1,16 +1,19 @@
+from collections.abc import Mapping
+from types import MappingProxyType
+
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
 
 class SourceDefinition(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     title: str = Field(min_length=1)
     url: HttpUrl
     source_type: str = Field(min_length=1)
 
 
-APPROVED_SOURCES: dict[str, list[SourceDefinition]] = {
-    "communication": [
+_APPROVED_SOURCES: dict[str, tuple[SourceDefinition, ...]] = {
+    "communication": (
         SourceDefinition.model_validate(
             {
                 "title": "Purdue OWL Grammar",
@@ -25,8 +28,8 @@ APPROVED_SOURCES: dict[str, list[SourceDefinition]] = {
                 "source_type": "official_learning_resource",
             }
         ),
-    ],
-    "java": [
+    ),
+    "java": (
         SourceDefinition.model_validate(
             {
                 "title": "Java Documentation",
@@ -41,5 +44,9 @@ APPROVED_SOURCES: dict[str, list[SourceDefinition]] = {
                 "source_type": "official_documentation",
             }
         ),
-    ],
+    ),
 }
+
+APPROVED_SOURCES: Mapping[str, tuple[SourceDefinition, ...]] = MappingProxyType(
+    _APPROVED_SOURCES
+)

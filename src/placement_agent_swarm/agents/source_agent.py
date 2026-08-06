@@ -1,6 +1,7 @@
 from placement_agent_swarm.config import (
     APPROVED_SOURCES,
     DOMAIN_WEB_SOURCE_CONFIGS,
+    SourceDefinition,
     WebSourceConfig,
 )
 from placement_agent_swarm.connectors import (
@@ -14,7 +15,10 @@ DEFAULT_DOMAIN_WEB_SOURCE_CONFIG = WebSourceConfig()
 
 
 def source_agent(state: AgentState) -> dict[str, object]:
-    source_definitions = APPROVED_SOURCES.get(state.domain, [])
+    source_definitions: tuple[SourceDefinition, ...] = APPROVED_SOURCES.get(
+        state.domain,
+        (),
+    )
 
     if not source_definitions:
         return {
