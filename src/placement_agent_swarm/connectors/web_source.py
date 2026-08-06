@@ -3,12 +3,10 @@ from time import sleep
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
+from placement_agent_swarm.config import WebSourceConfig
 from placement_agent_swarm.schemas.source import CollectedSource
 
-DEFAULT_MAX_ATTEMPTS = 3
-DEFAULT_RETRY_DELAY_SECONDS = 1.0
-DEFAULT_REQUEST_TIMEOUT_SECONDS = 10.0
-DEFAULT_USER_AGENT = "placement-agent-swarm/0.1"
+DEFAULT_WEB_SOURCE_CONFIG = WebSourceConfig()
 
 
 class WebSourceFetchError(RuntimeError):
@@ -59,39 +57,22 @@ def fetch_web_source(
     url: str,
     title: str,
     source_type: str = "website",
-    max_attempts: int = DEFAULT_MAX_ATTEMPTS,
-    retry_delay_seconds: float = DEFAULT_RETRY_DELAY_SECONDS,
-    request_timeout_seconds: float = DEFAULT_REQUEST_TIMEOUT_SECONDS,
-    user_agent: str = DEFAULT_USER_AGENT,
+    config: WebSourceConfig = DEFAULT_WEB_SOURCE_CONFIG,
 ) -> CollectedSource:
-    if max_attempts < 1:
-        raise ValueError("max_attempts must be at least 1")
-
-    if retry_delay_seconds < 0:
-        raise ValueError("retry_delay_seconds cannot be negative")
-
-    if request_timeout_seconds <= 0:
-        raise ValueError("request_timeout_seconds must be greater than 0")
-
-    cleaned_user_agent = user_agent.strip()
-
-    if not cleaned_user_agent:
-        raise ValueError("user_agent cannot be empty")
-
     request = Request(
         url,
         headers={
-            "User-Agent": cleaned_user_agent,
+            "User-Agent": config.user_agent,
         },
     )
 
     last_error: URLError | TimeoutError | OSError | None = None
 
-    for attempt in range(1, max_attempts + 1):
+    for attempt in range(1, config.max_attempts + 1):
         try:
             with urlopen(
                 request,
-                timeout=request_timeout_seconds,
+                timeout=config.request_timeout_seconds,
             ) as response:
                 html = response.read().decode(
                     "utf-8",
@@ -111,10 +92,10 @@ def fetch_web_source(
         except (URLError, TimeoutError, OSError) as exc:
             last_error = exc
 
-            if attempt < max_attempts:
-                sleep(retry_delay_seconds)
+            if attempt < config.max_attempts:
+                sleep(config.retry_delay_seconds)
 
     raise WebSourceFetchError(
         f"Failed to fetch web source after "
-        f"{max_attempts} attempts: {title}"
+        f"{config.max_attempts} attempts: {title}"
     ) from last_error

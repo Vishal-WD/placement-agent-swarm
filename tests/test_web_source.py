@@ -2,7 +2,9 @@ from unittest.mock import MagicMock, patch
 from urllib.error import URLError
 
 import pytest
+from pydantic import ValidationError
 
+from placement_agent_swarm.config import WebSourceConfig
 from placement_agent_swarm.connectors.web_source import (
     WebSourceFetchError,
     extract_text_from_html,
@@ -103,6 +105,11 @@ def test_fetch_web_source_retries_then_succeeds() -> None:
     mock_response.__enter__.return_value = mock_response
     mock_response.__exit__.return_value = False
 
+    config = WebSourceConfig(
+        max_attempts=2,
+        retry_delay_seconds=0.5,
+    )
+
     with (
         patch(
             "placement_agent_swarm.connectors.web_source.urlopen",
@@ -119,8 +126,7 @@ def test_fetch_web_source_retries_then_succeeds() -> None:
             url="https://example.com/retry",
             title="Retry Source",
             source_type="website",
-            max_attempts=2,
-            retry_delay_seconds=0.5,
+            config=config,
         )
 
     assert source.title == "Retry Source"
@@ -130,6 +136,11 @@ def test_fetch_web_source_retries_then_succeeds() -> None:
 
 
 def test_fetch_web_source_exhausts_all_attempts() -> None:
+    config = WebSourceConfig(
+        max_attempts=3,
+        retry_delay_seconds=0.25,
+    )
+
     with (
         patch(
             "placement_agent_swarm.connectors.web_source.urlopen",
@@ -150,8 +161,7 @@ def test_fetch_web_source_exhausts_all_attempts() -> None:
             url="https://example.com/retry",
             title="Retry Source",
             source_type="website",
-            max_attempts=3,
-            retry_delay_seconds=0.25,
+            config=config,
         )
 
     assert mock_urlopen.call_count == 3
@@ -160,28 +170,16 @@ def test_fetch_web_source_exhausts_all_attempts() -> None:
     assert isinstance(error_info.value.__cause__, URLError)
 
 
-def test_fetch_web_source_rejects_invalid_max_attempts() -> None:
-    with pytest.raises(
-        ValueError,
-        match="max_attempts must be at least 1",
-    ):
-        fetch_web_source(
-            url="https://example.com/retry",
-            title="Retry Source",
-            max_attempts=0,
-        )
+def test_web_source_config_rejects_invalid_max_attempts() -> None:
+    with pytest.raises(ValidationError):
+        WebSourceConfig(max_attempts=0)
 
 
-def test_fetch_web_source_rejects_negative_retry_delay() -> None:
-    with pytest.raises(
-        ValueError,
-        match="retry_delay_seconds cannot be negative",
-    ):
-        fetch_web_source(
-            url="https://example.com/retry",
-            title="Retry Source",
-            retry_delay_seconds=-0.1,
-        )
+def test_web_source_config_rejects_negative_retry_delay() -> None:
+    with pytest.raises(ValidationError):
+        WebSourceConfig(retry_delay_seconds=-0.1)
+
+
 def test_fetch_web_source_uses_configured_request_timeout() -> None:
     mock_response = MagicMock()
     mock_response.read.return_value = (
@@ -190,6 +188,8 @@ def test_fetch_web_source_uses_configured_request_timeout() -> None:
     mock_response.__enter__.return_value = mock_response
     mock_response.__exit__.return_value = False
 
+    config = WebSourceConfig(request_timeout_seconds=4.5)
+
     with patch(
         "placement_agent_swarm.connectors.web_source.urlopen",
         return_value=mock_response,
@@ -197,7 +197,7 @@ def test_fetch_web_source_uses_configured_request_timeout() -> None:
         source = fetch_web_source(
             url="https://example.com/timeout",
             title="Timeout Source",
-            request_timeout_seconds=4.5,
+            config=config,
         )
 
     assert source.title == "Timeout Source"
@@ -209,16 +209,47 @@ def test_fetch_web_source_uses_configured_request_timeout() -> None:
     assert mock_urlopen.call_args.kwargs["timeout"] == 4.5
 
 
-def test_fetch_web_source_rejects_invalid_request_timeout() -> None:
-    with pytest.raises(
-        ValueError,
-        match="request_timeout_seconds must be greater than 0",
-    ):
-        fetch_web_source(
-            url="https://example.com/timeout",
-            title="Timeout Source",
-            request_timeout_seconds=0,
+def test_web_source_config_rejects_invalid_request_timeout() -> None:
+    with pytest.raises(ValidationError):
+        WebSourceConfig(request_timeout_seconds=0)
+
+
+def test_fetch_web_source_uses_configured_user_agent() -> None:
+    mock_response = MagicMock()
+    mock_response.read.return_value = (
+        b"<html><body><p>User agent content</p></body></html>"
+    )
+    mock_response.__enter__.return_value = mock_response
+    mock_response.__exit__.return_value = False
+
+    config = WebSourceConfig(
+        user_agent="placement-agent-swarm-test/1.0",
+    )
+
+    with patch(
+        "placement_agent_swarm.connectors.web_source.urlopen",
+        return_value=mock_response,
+    ) as mock_urlopen:
+        source = fetch_web_source(
+            url="https://example.com/user-agent",
+            title="User Agent Source",
+            config=config,
         )
+
+    assert source.title == "User Agent Source"
+    assert source.content == "User agent content"
+
+    request = mock_urlopen.call_args.args[0]
+
+    assert request.get_header("User-agent") == (
+        "placement-agent-swarm-test/1.0"
+    )
+
+
+def test_web_source_config_rejects_empty_user_agent() -> None:
+    with pytest.raises(ValidationError):
+        WebSourceConfig(user_agent="   ")
+
 
 def test_extract_text_from_html_removes_tags() -> None:
     html = (
@@ -234,45 +265,7 @@ def test_extract_text_from_html_removes_tags() -> None:
         "The verb must agree with the subject."
     )
 
-def test_fetch_web_source_uses_configured_user_agent() -> None:
-    mock_response = MagicMock()
-    mock_response.read.return_value = (
-        b"<html><body><p>User agent content</p></body></html>"
-    )
-    mock_response.__enter__.return_value = mock_response
-    mock_response.__exit__.return_value = False
 
-    with patch(
-        "placement_agent_swarm.connectors.web_source.urlopen",
-        return_value=mock_response,
-    ) as mock_urlopen:
-        source = fetch_web_source(
-            url="https://example.com/user-agent",
-            title="User Agent Source",
-            user_agent="placement-agent-swarm-test/1.0",
-        )
-
-    assert source.title == "User Agent Source"
-    assert source.content == "User agent content"
-
-    request = mock_urlopen.call_args.args[0]
-
-    assert request.get_header("User-agent") == (
-        "placement-agent-swarm-test/1.0"
-    )
-
-
-def test_fetch_web_source_rejects_empty_user_agent() -> None:
-    with pytest.raises(
-        ValueError,
-        match="user_agent cannot be empty",
-    ):
-        fetch_web_source(
-            url="https://example.com/user-agent",
-            title="User Agent Source",
-            user_agent="   ",
-        )
-        
 def test_extract_text_from_html_ignores_style_and_script() -> None:
     html = (
         "<html>"
