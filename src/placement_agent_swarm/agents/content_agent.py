@@ -19,5 +19,5 @@ def content_agent(state: AgentState) -> dict[str, object]:
         "current_agent": "content_agent",
         "next_agent": "end",
         "generated_content": generated_content,
-        "error_message": None,
+        "error_message": state.error_message,
     }

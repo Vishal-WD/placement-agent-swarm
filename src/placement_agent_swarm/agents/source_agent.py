@@ -1,5 +1,8 @@
+from urllib.error import URLError
+
 from placement_agent_swarm.config import APPROVED_SOURCES
 from placement_agent_swarm.connectors import fetch_web_source
+from placement_agent_swarm.schemas.source import CollectedSource
 from placement_agent_swarm.schemas.state import AgentState, WorkflowStatus
 
 
@@ -17,18 +20,44 @@ def source_agent(state: AgentState) -> dict[str, object]:
             ),
         }
 
-    sources = [
-        fetch_web_source(
-            url=str(source.url),
-            title=source.title,
-            source_type=source.source_type,
+    sources: list[CollectedSource] = []
+    failed_sources: list[str] = []
+
+    for source in source_definitions:
+        try:
+            collected_source = fetch_web_source(
+                url=str(source.url),
+                title=source.title,
+                source_type=source.source_type,
+            )
+        except (URLError, TimeoutError, OSError):
+            failed_sources.append(source.title)
+            continue
+
+        sources.append(collected_source)
+
+    if not sources:
+        return {
+            "status": WorkflowStatus.FAILED,
+            "current_agent": "source_agent",
+            "next_agent": "end",
+            "sources": [],
+            "error_message": (
+                f"All approved sources failed for domain: {state.domain}"
+            ),
+        }
+
+    error_message = None
+
+    if failed_sources:
+        error_message = (
+            "Some approved sources could not be fetched: "
+            + ", ".join(failed_sources)
         )
-        for source in source_definitions
-    ]
 
     return {
         "current_agent": "source_agent",
         "next_agent": "content_agent",
         "sources": sources,
-        "error_message": None,
+        "error_message": error_message,
     }

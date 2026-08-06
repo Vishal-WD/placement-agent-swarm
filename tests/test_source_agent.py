@@ -1,4 +1,5 @@
 from unittest.mock import call, patch
+from urllib.error import URLError
 
 from placement_agent_swarm.agents.source_agent import source_agent
 from placement_agent_swarm.schemas.source import CollectedSource
@@ -56,6 +57,8 @@ def test_source_agent_fetches_all_approved_domain_sources() -> None:
             source_type="official_learning_resource",
         ),
     ]
+
+
 def test_source_agent_fails_when_domain_has_no_approved_sources() -> None:
     state = make_agent_state(
         status=WorkflowStatus.RUNNING,
@@ -78,3 +81,62 @@ def test_source_agent_fails_when_domain_has_no_approved_sources() -> None:
     )
 
     mock_fetch.assert_not_called()
+
+
+def test_source_agent_continues_when_one_source_fails() -> None:
+    successful_source = CollectedSource.model_validate(
+        {
+            "title": "British Council Grammar",
+            "url": "https://learnenglish.britishcouncil.org/grammar",
+            "source_type": "official_learning_resource",
+            "content": "Grammar learning content from the British Council.",
+        }
+    )
+
+    state = make_agent_state(
+        status=WorkflowStatus.RUNNING,
+        current_agent="supervisor",
+        next_agent="source_agent",
+        domain="communication",
+    )
+
+    with patch(
+        "placement_agent_swarm.agents.source_agent.fetch_web_source",
+        side_effect=[
+            URLError("Purdue source unavailable"),
+            successful_source,
+        ],
+    ):
+        result = source_agent(state)
+
+    assert result["current_agent"] == "source_agent"
+    assert result["next_agent"] == "content_agent"
+    assert result["sources"] == [successful_source]
+    assert result["error_message"] == (
+        "Some approved sources could not be fetched: Purdue OWL Grammar"
+    )
+
+
+def test_source_agent_fails_when_all_sources_fail() -> None:
+    state = make_agent_state(
+        status=WorkflowStatus.RUNNING,
+        current_agent="supervisor",
+        next_agent="source_agent",
+        domain="communication",
+    )
+
+    with patch(
+        "placement_agent_swarm.agents.source_agent.fetch_web_source",
+        side_effect=URLError("Source unavailable"),
+    ) as mock_fetch:
+        result = source_agent(state)
+
+    assert result["status"] == WorkflowStatus.FAILED
+    assert result["current_agent"] == "source_agent"
+    assert result["next_agent"] == "end"
+    assert result["sources"] == []
+    assert result["error_message"] == (
+        "All approved sources failed for domain: communication"
+    )
+
+    assert mock_fetch.call_count == 2
