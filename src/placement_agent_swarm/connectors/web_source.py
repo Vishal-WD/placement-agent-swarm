@@ -4,7 +4,7 @@ from urllib.error import URLError
 from urllib.request import Request, urlopen
 
 from placement_agent_swarm.config import WebSourceConfig
-from placement_agent_swarm.schemas.source import CollectedSource
+from placement_agent_swarm.schemas.source import CollectedSource, SourceType
 
 DEFAULT_WEB_SOURCE_CONFIG = WebSourceConfig()
 
@@ -56,7 +56,7 @@ def fetch_web_source(
     *,
     url: str,
     title: str,
-    source_type: str = "website",
+    source_type: SourceType = SourceType.OFFICIAL_DOCUMENTATION,
     config: WebSourceConfig = DEFAULT_WEB_SOURCE_CONFIG,
 ) -> CollectedSource:
     request = Request(

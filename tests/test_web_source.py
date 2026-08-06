@@ -9,6 +9,7 @@ from placement_agent_swarm.connectors.web_source import (
     extract_text_from_html,
     fetch_web_source,
 )
+from placement_agent_swarm.schemas.source import SourceType
 
 
 def test_fetch_web_source_returns_cleaned_collected_source() -> None:
@@ -27,12 +28,12 @@ def test_fetch_web_source_returns_cleaned_collected_source() -> None:
         source = fetch_web_source(
             url="https://example.com/grammar",
             title="Grammar Guide",
-            source_type="website",
+            source_type=SourceType.OFFICIAL_DOCUMENTATION,
         )
 
     assert source.title == "Grammar Guide"
     assert str(source.url) == "https://example.com/grammar"
-    assert source.source_type == "website"
+    assert source.source_type == SourceType.OFFICIAL_DOCUMENTATION
     assert source.content == (
         "Grammar Guide Subject-verb agreement content"
     )
@@ -62,7 +63,7 @@ def test_fetch_web_source_converts_url_error() -> None:
         fetch_web_source(
             url="https://example.com/grammar",
             title="Grammar Guide",
-            source_type="website",
+            source_type=SourceType.OFFICIAL_DOCUMENTATION,
         )
 
     assert isinstance(error_info.value.__cause__, URLError)
@@ -89,7 +90,7 @@ def test_fetch_web_source_converts_timeout_error() -> None:
         fetch_web_source(
             url="https://example.com/grammar",
             title="Grammar Guide",
-            source_type="website",
+            source_type=SourceType.OFFICIAL_DOCUMENTATION,
         )
 
     assert isinstance(error_info.value.__cause__, TimeoutError)
@@ -124,11 +125,12 @@ def test_fetch_web_source_retries_then_succeeds() -> None:
         source = fetch_web_source(
             url="https://example.com/retry",
             title="Retry Source",
-            source_type="website",
+            source_type=SourceType.OFFICIAL_DOCUMENTATION,
             config=config,
         )
 
     assert source.title == "Retry Source"
+    assert source.source_type == SourceType.OFFICIAL_DOCUMENTATION
     assert source.content == "Recovered content"
     assert mock_urlopen.call_count == 2
     mock_sleep.assert_called_once_with(0.5)
@@ -159,7 +161,7 @@ def test_fetch_web_source_exhausts_all_attempts() -> None:
         fetch_web_source(
             url="https://example.com/retry",
             title="Retry Source",
-            source_type="website",
+            source_type=SourceType.OFFICIAL_DOCUMENTATION,
             config=config,
         )
 
@@ -190,6 +192,7 @@ def test_fetch_web_source_uses_configured_request_timeout() -> None:
         )
 
     assert source.title == "Timeout Source"
+    assert source.source_type == SourceType.OFFICIAL_DOCUMENTATION
     assert source.content == "Timeout configuration content"
 
     request = mock_urlopen.call_args.args[0]
@@ -221,6 +224,7 @@ def test_fetch_web_source_uses_configured_user_agent() -> None:
         )
 
     assert source.title == "User Agent Source"
+    assert source.source_type == SourceType.OFFICIAL_DOCUMENTATION
     assert source.content == "User agent content"
 
     request = mock_urlopen.call_args.args[0]

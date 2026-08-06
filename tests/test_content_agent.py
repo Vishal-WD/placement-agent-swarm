@@ -9,7 +9,7 @@ def test_content_agent_generates_content() -> None:
         {
             "title": "Approved source for subject-verb agreement",
             "url": "https://example.com/",
-            "source_type": "placeholder",
+            "source_type": "official_learning_resource",
             "content": (
                 "Approved source placeholder content for: "
                 "subject-verb agreement"
