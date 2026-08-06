@@ -182,7 +182,43 @@ def test_fetch_web_source_rejects_negative_retry_delay() -> None:
             title="Retry Source",
             retry_delay_seconds=-0.1,
         )
+def test_fetch_web_source_uses_configured_request_timeout() -> None:
+    mock_response = MagicMock()
+    mock_response.read.return_value = (
+        b"<html><body><p>Timeout configuration content</p></body></html>"
+    )
+    mock_response.__enter__.return_value = mock_response
+    mock_response.__exit__.return_value = False
 
+    with patch(
+        "placement_agent_swarm.connectors.web_source.urlopen",
+        return_value=mock_response,
+    ) as mock_urlopen:
+        source = fetch_web_source(
+            url="https://example.com/timeout",
+            title="Timeout Source",
+            request_timeout_seconds=4.5,
+        )
+
+    assert source.title == "Timeout Source"
+    assert source.content == "Timeout configuration content"
+
+    request = mock_urlopen.call_args.args[0]
+
+    assert request.full_url == "https://example.com/timeout"
+    assert mock_urlopen.call_args.kwargs["timeout"] == 4.5
+
+
+def test_fetch_web_source_rejects_invalid_request_timeout() -> None:
+    with pytest.raises(
+        ValueError,
+        match="request_timeout_seconds must be greater than 0",
+    ):
+        fetch_web_source(
+            url="https://example.com/timeout",
+            title="Timeout Source",
+            request_timeout_seconds=0,
+        )
 
 def test_extract_text_from_html_removes_tags() -> None:
     html = (
