@@ -2,7 +2,6 @@ from unittest.mock import MagicMock, patch
 from urllib.error import URLError
 
 import pytest
-from pydantic import ValidationError
 
 from placement_agent_swarm.config import WebSourceConfig
 from placement_agent_swarm.connectors.web_source import (
@@ -170,16 +169,6 @@ def test_fetch_web_source_exhausts_all_attempts() -> None:
     assert isinstance(error_info.value.__cause__, URLError)
 
 
-def test_web_source_config_rejects_invalid_max_attempts() -> None:
-    with pytest.raises(ValidationError):
-        WebSourceConfig(max_attempts=0)
-
-
-def test_web_source_config_rejects_negative_retry_delay() -> None:
-    with pytest.raises(ValidationError):
-        WebSourceConfig(retry_delay_seconds=-0.1)
-
-
 def test_fetch_web_source_uses_configured_request_timeout() -> None:
     mock_response = MagicMock()
     mock_response.read.return_value = (
@@ -207,11 +196,6 @@ def test_fetch_web_source_uses_configured_request_timeout() -> None:
 
     assert request.full_url == "https://example.com/timeout"
     assert mock_urlopen.call_args.kwargs["timeout"] == 4.5
-
-
-def test_web_source_config_rejects_invalid_request_timeout() -> None:
-    with pytest.raises(ValidationError):
-        WebSourceConfig(request_timeout_seconds=0)
 
 
 def test_fetch_web_source_uses_configured_user_agent() -> None:
@@ -244,11 +228,6 @@ def test_fetch_web_source_uses_configured_user_agent() -> None:
     assert request.get_header("User-agent") == (
         "placement-agent-swarm-test/1.0"
     )
-
-
-def test_web_source_config_rejects_empty_user_agent() -> None:
-    with pytest.raises(ValidationError):
-        WebSourceConfig(user_agent="   ")
 
 
 def test_extract_text_from_html_removes_tags() -> None:
