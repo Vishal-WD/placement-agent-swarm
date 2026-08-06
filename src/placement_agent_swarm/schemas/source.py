@@ -9,7 +9,10 @@ class SourceType(StrEnum):
 
 
 class CollectedSource(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+    )
 
     title: str = Field(min_length=1)
     url: HttpUrl
