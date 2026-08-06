@@ -1,7 +1,12 @@
 from html.parser import HTMLParser
+from urllib.error import URLError
 from urllib.request import Request, urlopen
 
 from placement_agent_swarm.schemas.source import CollectedSource
+
+
+class WebSourceFetchError(RuntimeError):
+    """Raised when a web source cannot be fetched."""
 
 
 class HTMLTextExtractor(HTMLParser):
@@ -56,8 +61,13 @@ def fetch_web_source(
         },
     )
 
-    with urlopen(request, timeout=10) as response:
-        html = response.read().decode("utf-8", errors="replace")
+    try:
+        with urlopen(request, timeout=10) as response:
+            html = response.read().decode("utf-8", errors="replace")
+    except (URLError, TimeoutError, OSError) as exc:
+        raise WebSourceFetchError(
+            f"Failed to fetch web source: {title}"
+        ) from exc
 
     content = extract_text_from_html(html)
 

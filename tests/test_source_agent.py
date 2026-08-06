@@ -1,7 +1,7 @@
 from unittest.mock import call, patch
-from urllib.error import URLError
 
 from placement_agent_swarm.agents.source_agent import source_agent
+from placement_agent_swarm.connectors import WebSourceFetchError
 from placement_agent_swarm.schemas.source import CollectedSource
 from placement_agent_swarm.schemas.state import WorkflowStatus
 from tests.factories import make_agent_state
@@ -103,7 +103,7 @@ def test_source_agent_continues_when_one_source_fails() -> None:
     with patch(
         "placement_agent_swarm.agents.source_agent.fetch_web_source",
         side_effect=[
-            URLError("Purdue source unavailable"),
+            WebSourceFetchError("Purdue source unavailable"),
             successful_source,
         ],
     ):
@@ -127,7 +127,7 @@ def test_source_agent_fails_when_all_sources_fail() -> None:
 
     with patch(
         "placement_agent_swarm.agents.source_agent.fetch_web_source",
-        side_effect=URLError("Source unavailable"),
+        side_effect=WebSourceFetchError("Source unavailable"),
     ) as mock_fetch:
         result = source_agent(state)
 

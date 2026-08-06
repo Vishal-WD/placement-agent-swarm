@@ -1,6 +1,10 @@
 from unittest.mock import MagicMock, patch
+from urllib.error import URLError
+
+import pytest
 
 from placement_agent_swarm.connectors.web_source import (
+    WebSourceFetchError,
     extract_text_from_html,
     fetch_web_source,
 )
@@ -37,6 +41,46 @@ def test_fetch_web_source_returns_cleaned_collected_source() -> None:
     mock_urlopen.assert_called_once()
 
 
+def test_fetch_web_source_converts_url_error() -> None:
+    with (
+        patch(
+            "placement_agent_swarm.connectors.web_source.urlopen",
+            side_effect=URLError("Connection failed"),
+        ),
+        pytest.raises(
+            WebSourceFetchError,
+            match="Failed to fetch web source: Grammar Guide",
+        ) as error_info,
+    ):
+        fetch_web_source(
+            url="https://example.com/grammar",
+            title="Grammar Guide",
+            source_type="website",
+        )
+
+    assert isinstance(error_info.value.__cause__, URLError)
+
+
+def test_fetch_web_source_converts_timeout_error() -> None:
+    with (
+        patch(
+            "placement_agent_swarm.connectors.web_source.urlopen",
+            side_effect=TimeoutError("Request timed out"),
+        ),
+        pytest.raises(
+            WebSourceFetchError,
+            match="Failed to fetch web source: Grammar Guide",
+        ) as error_info,
+    ):
+        fetch_web_source(
+            url="https://example.com/grammar",
+            title="Grammar Guide",
+            source_type="website",
+        )
+
+    assert isinstance(error_info.value.__cause__, TimeoutError)
+
+
 def test_extract_text_from_html_removes_tags() -> None:
     html = (
         "<html><head><title>Grammar</title></head>"
@@ -50,6 +94,8 @@ def test_extract_text_from_html_removes_tags() -> None:
         "Grammar Subject-Verb Agreement "
         "The verb must agree with the subject."
     )
+
+
 def test_extract_text_from_html_ignores_style_and_script() -> None:
     html = (
         "<html>"
