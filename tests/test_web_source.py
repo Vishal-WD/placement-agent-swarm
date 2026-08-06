@@ -47,9 +47,15 @@ def test_fetch_web_source_converts_url_error() -> None:
             "placement_agent_swarm.connectors.web_source.urlopen",
             side_effect=URLError("Connection failed"),
         ),
+        patch(
+            "placement_agent_swarm.connectors.web_source.sleep"
+        ) as mock_sleep,
         pytest.raises(
             WebSourceFetchError,
-            match="Failed to fetch web source: Grammar Guide",
+            match=(
+                "Failed to fetch web source after "
+                "3 attempts: Grammar Guide"
+            ),
         ) as error_info,
     ):
         fetch_web_source(
@@ -59,6 +65,7 @@ def test_fetch_web_source_converts_url_error() -> None:
         )
 
     assert isinstance(error_info.value.__cause__, URLError)
+    assert mock_sleep.call_count == 2
 
 
 def test_fetch_web_source_converts_timeout_error() -> None:
@@ -67,9 +74,15 @@ def test_fetch_web_source_converts_timeout_error() -> None:
             "placement_agent_swarm.connectors.web_source.urlopen",
             side_effect=TimeoutError("Request timed out"),
         ),
+        patch(
+            "placement_agent_swarm.connectors.web_source.sleep"
+        ) as mock_sleep,
         pytest.raises(
             WebSourceFetchError,
-            match="Failed to fetch web source: Grammar Guide",
+            match=(
+                "Failed to fetch web source after "
+                "3 attempts: Grammar Guide"
+            ),
         ) as error_info,
     ):
         fetch_web_source(
@@ -79,6 +92,96 @@ def test_fetch_web_source_converts_timeout_error() -> None:
         )
 
     assert isinstance(error_info.value.__cause__, TimeoutError)
+    assert mock_sleep.call_count == 2
+
+
+def test_fetch_web_source_retries_then_succeeds() -> None:
+    mock_response = MagicMock()
+    mock_response.read.return_value = (
+        b"<html><body><p>Recovered content</p></body></html>"
+    )
+    mock_response.__enter__.return_value = mock_response
+    mock_response.__exit__.return_value = False
+
+    with (
+        patch(
+            "placement_agent_swarm.connectors.web_source.urlopen",
+            side_effect=[
+                URLError("Temporary failure"),
+                mock_response,
+            ],
+        ) as mock_urlopen,
+        patch(
+            "placement_agent_swarm.connectors.web_source.sleep"
+        ) as mock_sleep,
+    ):
+        source = fetch_web_source(
+            url="https://example.com/retry",
+            title="Retry Source",
+            source_type="website",
+            max_attempts=2,
+            retry_delay_seconds=0.5,
+        )
+
+    assert source.title == "Retry Source"
+    assert source.content == "Recovered content"
+    assert mock_urlopen.call_count == 2
+    mock_sleep.assert_called_once_with(0.5)
+
+
+def test_fetch_web_source_exhausts_all_attempts() -> None:
+    with (
+        patch(
+            "placement_agent_swarm.connectors.web_source.urlopen",
+            side_effect=URLError("Persistent failure"),
+        ) as mock_urlopen,
+        patch(
+            "placement_agent_swarm.connectors.web_source.sleep"
+        ) as mock_sleep,
+        pytest.raises(
+            WebSourceFetchError,
+            match=(
+                "Failed to fetch web source after "
+                "3 attempts: Retry Source"
+            ),
+        ) as error_info,
+    ):
+        fetch_web_source(
+            url="https://example.com/retry",
+            title="Retry Source",
+            source_type="website",
+            max_attempts=3,
+            retry_delay_seconds=0.25,
+        )
+
+    assert mock_urlopen.call_count == 3
+    assert mock_sleep.call_count == 2
+    mock_sleep.assert_called_with(0.25)
+    assert isinstance(error_info.value.__cause__, URLError)
+
+
+def test_fetch_web_source_rejects_invalid_max_attempts() -> None:
+    with pytest.raises(
+        ValueError,
+        match="max_attempts must be at least 1",
+    ):
+        fetch_web_source(
+            url="https://example.com/retry",
+            title="Retry Source",
+            max_attempts=0,
+        )
+
+
+def test_fetch_web_source_rejects_negative_retry_delay() -> None:
+    with pytest.raises(
+        ValueError,
+        match="retry_delay_seconds cannot be negative",
+    ):
+        fetch_web_source(
+            url="https://example.com/retry",
+            title="Retry Source",
+            retry_delay_seconds=-0.1,
+        )
 
 
 def test_extract_text_from_html_removes_tags() -> None:

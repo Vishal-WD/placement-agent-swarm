@@ -1,8 +1,12 @@
 from html.parser import HTMLParser
+from time import sleep
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
 from placement_agent_swarm.schemas.source import CollectedSource
+
+DEFAULT_MAX_ATTEMPTS = 3
+DEFAULT_RETRY_DELAY_SECONDS = 1.0
 
 
 class WebSourceFetchError(RuntimeError):
@@ -53,7 +57,15 @@ def fetch_web_source(
     url: str,
     title: str,
     source_type: str = "website",
+    max_attempts: int = DEFAULT_MAX_ATTEMPTS,
+    retry_delay_seconds: float = DEFAULT_RETRY_DELAY_SECONDS,
 ) -> CollectedSource:
+    if max_attempts < 1:
+        raise ValueError("max_attempts must be at least 1")
+
+    if retry_delay_seconds < 0:
+        raise ValueError("retry_delay_seconds cannot be negative")
+
     request = Request(
         url,
         headers={
@@ -61,21 +73,33 @@ def fetch_web_source(
         },
     )
 
-    try:
-        with urlopen(request, timeout=10) as response:
-            html = response.read().decode("utf-8", errors="replace")
-    except (URLError, TimeoutError, OSError) as exc:
-        raise WebSourceFetchError(
-            f"Failed to fetch web source: {title}"
-        ) from exc
+    last_error: URLError | TimeoutError | OSError | None = None
 
-    content = extract_text_from_html(html)
+    for attempt in range(1, max_attempts + 1):
+        try:
+            with urlopen(request, timeout=10) as response:
+                html = response.read().decode(
+                    "utf-8",
+                    errors="replace",
+                )
 
-    return CollectedSource.model_validate(
-        {
-            "title": title,
-            "url": url,
-            "source_type": source_type,
-            "content": content,
-        }
-    )
+            content = extract_text_from_html(html)
+
+            return CollectedSource.model_validate(
+                {
+                    "title": title,
+                    "url": url,
+                    "source_type": source_type,
+                    "content": content,
+                }
+            )
+        except (URLError, TimeoutError, OSError) as exc:
+            last_error = exc
+
+            if attempt < max_attempts:
+                sleep(retry_delay_seconds)
+
+    raise WebSourceFetchError(
+        f"Failed to fetch web source after "
+        f"{max_attempts} attempts: {title}"
+    ) from last_error
